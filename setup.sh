@@ -32,3 +32,5 @@ for dotfile in "${dotfiles[@]}"; do
 done
 
 echo "symbolic ilnk created"
+
+touch $HOME/.zshrc.local # to write zsh settings only for local
