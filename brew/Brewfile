@@ -1,7 +1,6 @@
 tap "heroku/brew"
 tap "homebrew/bundle"
 tap "homebrew/core"
-brew "awscli"
 brew "gobject-introspection"
 brew "srt"
 brew "ffmpeg"
