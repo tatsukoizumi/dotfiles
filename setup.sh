@@ -1,6 +1,8 @@
 #!/bin/bash
 set -eu
 
+THIS_DIR=$(pwd)
+
 echo "start setup..."
 cd $HOME
 
@@ -16,7 +18,7 @@ brew update
 echo "run brew upgrade ..."
 brew upgrade
 
-brew bundle
+brew bundle install --file "${THIS_DIR}/brew/Brewfile"
 
 brew cleanup
 
