@@ -1,4 +1,4 @@
-# tatsukoizumi's dotfile
+# tatsukoizumi's dotfiles
 
 ### Usage
 ```sh
