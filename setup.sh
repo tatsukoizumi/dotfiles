@@ -36,3 +36,6 @@ done
 echo "symbolic ilnk created"
 
 touch $HOME/.zshrc.local # to write zsh settings only for local
+
+echo "Setting VSCode ..."
+sh $THIS_DIR/vscode/install.sh
