@@ -7,10 +7,9 @@ function peco-history-selection() {
     else
         tac="tail -r"
     fi
-
     BUFFER=$(\history -n 1 | \
         eval $tac | \
-        peco --query "$LBUFFER")
+    peco --query "$LBUFFER")
     CURSOR=$#BUFFER
     zle clear-screen
 }
@@ -19,41 +18,41 @@ bindkey '^R' peco-history-selection
 
 ### cd with ^J
 if [[ -n $(echo ${^fpath}/chpwd_recent_dirs(N)) && -n $(echo ${^fpath}/cdr(N)) ]]; then
-  autoload -Uz chpwd_recent_dirs cdr add-zsh-hook
-  add-zsh-hook chpwd chpwd_recent_dirs
-  zstyle ':completion:*' recent-dirs-insert both
-  zstyle ':chpwd:*' recent-dirs-default true
-  zstyle ':chpwd:*' recent-dirs-max 1000
-  zstyle ':chpwd:*' recent-dirs-file "$HOME/.cache/chpwd-recent-dirs"
+    autoload -Uz chpwd_recent_dirs cdr add-zsh-hook
+    add-zsh-hook chpwd chpwd_recent_dirs
+    zstyle ':completion:*' recent-dirs-insert both
+    zstyle ':chpwd:*' recent-dirs-default true
+    zstyle ':chpwd:*' recent-dirs-max 1000
+    zstyle ':chpwd:*' recent-dirs-file "$HOME/.cache/chpwd-recent-dirs"
 fi
 function peco-cdr () {
-  local selected_dir="$(cdr -l | sed 's/^[0-9]* *//' | peco)"
-  if [ -n "$selected_dir" ]; then
-    BUFFER="cd ${selected_dir}"
-    zle accept-line
-  fi
+    local selected_dir="$(cdr -l | sed 's/^[0-9]* *//' | peco)"
+    if [ -n "$selected_dir" ]; then
+        BUFFER="cd ${selected_dir}"
+        zle accept-line
+    fi
 }
 zle -N peco-cdr
 bindkey '^J' peco-cdr
 
 ### cd to current dir
 function find_cd() {
-  local selected_dir=$(find . -type d | peco)
-  if [ -n "$selected_dir" ]; then
-    BUFFER="cd ${selected_dir}"
-    zle accept-line
-  fi
+    local selected_dir=$(find . -type d | peco)
+    if [ -n "$selected_dir" ]; then
+        BUFFER="cd ${selected_dir}"
+        zle accept-line
+    fi
 }
 zle -N find_cd
 bindkey '^N' find_cd
 
 ### checkout git branch with ^G
 function peco-src () {
-  local selected_dir=$(ghq list -p | peco)
-  if [ -n "$selected_dir" ]; then
-    BUFFER="cd ${selected_dir}"
-    zle accept-line
-  fi
+    local selected_dir=$(ghq list -p | peco)
+    if [ -n "$selected_dir" ]; then
+        BUFFER="cd ${selected_dir}"
+        zle accept-line
+    fi
 }
 zle -N peco-src
 bindkey '^G' peco-src

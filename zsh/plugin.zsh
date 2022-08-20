@@ -10,11 +10,11 @@ zplug "romkatv/powerlevel10k", as:theme, depth:1
 
 # Install plugins if not installed
 if ! zplug check --verbose; then
-  printf "Install? [y/N]: "
-  if read -q; then
-    echo
-    zplug install
-  fi
+    printf "Install? [y/N]: "
+    if read -q; then
+        echo
+        zplug install
+    fi
 fi
 
 zplug load

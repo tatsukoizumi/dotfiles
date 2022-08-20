@@ -30,7 +30,7 @@ dotfiles=($zsh_config_file $tmux_config_file)
 
 # Create symbolic links
 for dotfile in "${dotfiles[@]}"; do
-  [ ! -e $dotfile ] && ln -snfv ./dotfiles/$dotfile .
+    [ ! -e $dotfile ] && ln -snfv ./dotfiles/$dotfile .
 done
 
 echo "symbolic ilnk created"
