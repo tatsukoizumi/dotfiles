@@ -1,7 +1,7 @@
 tap "heroku/brew"
 tap "homebrew/bundle"
 tap "homebrew/core"
-brew "awscli", link: false
+brew "awscli"
 brew "gobject-introspection"
 brew "srt"
 brew "ffmpeg"
@@ -14,7 +14,7 @@ brew "hugo"
 brew "peco"
 brew "pyenv"
 brew "tcl-tk"
-brew "python@3.8", link: false
+brew "python@3.9"
 brew "ruby-build"
 brew "rbenv"
 brew "tfenv"
