@@ -20,8 +20,11 @@ brew bundle
 
 brew cleanup
 
+zsh_config_file="zsh/.zshrc"
+tmux_config_file="tmux/.tmux.conf"
+
 # a list of dotfiles
-dotfiles=(.zshrc .tmux.conf)
+dotfiles=($zsh_config_file $tmux_config_file)
 
 # Create symbolic links
 for dotfile in "${dotfiles[@]}"; do
