@@ -1,16 +1,16 @@
 #!/bin/bash
 set -eu
 
-VSCODE_SETTING_DIR=$HOME/dotfiles/vscode
+paths=(keybindings.json settings.json)
 
-paths=($VSCODE_SETTING_DIR/keybindings.json $VSCODE_SETTING_DIR/settings.json)
+cd $HOME
 
 for file_path in ${paths[@]}
 do
-    ln -snfv $file_path $HOME/Library/Application\ Support/Code/User
+    ln -snfv ./dotfiles/vscode/$file_path ./Library/Application\ Support/Code/User
 done
 
-cat $VSCODE_SETTING_DIR/extensions | while read line
+cat ./dotfiles/vscode/extensions | while read line
 do
     code --install-extension $line
 done
