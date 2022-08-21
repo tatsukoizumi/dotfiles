@@ -24,7 +24,7 @@
   "[markdown]": {
     "editor.defaultFormatter": "yzhang.markdown-all-in-one"
   },
-  "workbench.colorTheme": "City Lights",
+  "workbench.colorTheme": "Tokyo City",
   "bracketPairColorizer.independentPairColors": [],
   "[json]": {
     "editor.defaultFormatter": "vscode.json-language-features"
