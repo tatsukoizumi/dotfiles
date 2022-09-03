@@ -2,8 +2,9 @@ export DOTFILES=$HOME/dotfiles
 
 source $HOME/.zshrc.local
 source $DOTFILES/zsh/alias.zsh
-source $DOTFILES/zsh/plugin.zsh
+source $DOTFILES/zsh/path.zsh
 source $DOTFILES/zsh/peco.zsh
+source $DOTFILES/zsh/plugin.zsh
 
 # Setting history
 HISTFILE=$ZDOTDIR/.zsh-history
