@@ -4,12 +4,14 @@ blanu.vscode-styled-jsx
 bradlc.vscode-tailwindcss
 christian-kohler.path-intellisense
 CoenraadS.bracket-pair-colorizer
+dbaeumer.vscode-eslint
 donjayamanne.githistory
 dsznajder.es7-react-js-snippets
 eamodio.gitlens
 ecmel.vscode-html-css
 EditorConfig.EditorConfig
 eg2.vscode-npm-script
+enkia.tokyo-night
 erd0s.terraform-autocomplete
 esbenp.prettier-vscode
 file-icons.file-icons
@@ -21,9 +23,11 @@ golang.go
 GraphQL.vscode-graphql
 GraphQL.vscode-graphql-syntax
 hashicorp.terraform
+huytd.tokyo-city
 idleberg.icon-fonts
 jonkwheeler.styled-components-snippets
 jpoissonnier.vscode-styled-components
+lkrms.inifmt
 LuanVSO.night-blue-theme
 mrmlnc.vscode-duplicate
 ms-azuretools.vscode-docker
@@ -37,10 +41,12 @@ PKief.material-icon-theme
 PulkitGangwar.nextjs-snippets
 rebornix.ruby
 redhat.vscode-yaml
+rust-lang.rust-analyzer
 sahmed.terraform-comments-beautifier
 shakram02.bash-beautify
 shardulm94.trailing-spaces
 sianglim.slim
+streetsidesoftware.code-spell-checker
 Sujan.code-blue
 vscode-icons-team.vscode-icons
 wingrunr21.vscode-ruby
@@ -48,4 +54,3 @@ wmaurer.vscode-jumpy
 xabikos.JavaScriptSnippets
 yummygum.city-lights-theme
 yzhang.markdown-all-in-one
-huytd.tokyo-city
