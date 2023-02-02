@@ -41,5 +41,6 @@
     "key": "ctrl+shift+b",
     "command": "cursorLeftSelect",
     "when": "textInputFocus"
-  }
+  },
+  { "key": "cmd+l", "command": "editor.action.selectHighlights" }
 ]
