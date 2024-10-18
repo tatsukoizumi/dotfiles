@@ -30,9 +30,4 @@ touch $HOME/.zshrc.local # to write zsh settings only for local
 
 source $HOME/.zshrc
 
-echo "setup git aliases"
-git config --global alias.cm commit
-git config --global alias.st status
-git config --global alias.co checkout
-
 echo "setup done!"
