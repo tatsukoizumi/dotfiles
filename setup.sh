@@ -1,4 +1,3 @@
-#!/bin/bash
 set -eu
 
 THIS_DIR=$(pwd)
@@ -22,20 +21,18 @@ brew bundle install --file "${THIS_DIR}/brew/Brewfile"
 
 brew cleanup
 
-zsh_config_file="zsh/.zshrc"
-tmux_config_file="tmux/.tmux.conf"
-
-# a list of dotfiles
-dotfiles=($zsh_config_file $tmux_config_file)
-
 # Create symbolic links
-for dotfile in "${dotfiles[@]}"; do
-    [ ! -e $dotfile ] && ln -snfv ./dotfiles/$dotfile .
-done
+ln -snfv ./dotfiles/zsh/.zshrc $HOME/.zshrc
 
 echo "symbolic ilnk created"
 
 touch $HOME/.zshrc.local # to write zsh settings only for local
 
-echo "Setting VSCode ..."
-sh $THIS_DIR/vscode/install.sh
+source $HOME/.zshrc
+
+echo "setup git aliases"
+git config --global alias.cm commit
+git config --global alias.st status
+git config --global alias.co checkout
+
+echo "setup done!"
