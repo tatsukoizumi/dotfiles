@@ -1,8 +1,7 @@
 [tools]
-aws = "latest"
 node = "24"
-pnpm = "latest"
-python = "3"
+python = "3.13.1"
+deno = "latest"
 
 [env]
 ENHANCD_FILTER = "peco"
