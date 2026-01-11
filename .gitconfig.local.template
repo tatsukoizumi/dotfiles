@@ -1,0 +1,14 @@
+# Local Git configuration (sensitive information)
+# Copy this file to ~/.gitconfig.local and fill in your personal information
+
+[user]
+	name = Your Name
+	email = your.email@example.com
+	# signingkey = ssh-ed25519 AAAA... (optional)
+
+# [gpg]
+# 	format = ssh
+# [gpg "ssh"]
+# 	program = /path/to/gpg-program
+# [commit]
+# 	gpgsign = true

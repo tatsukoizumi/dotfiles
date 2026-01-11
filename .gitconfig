@@ -1,0 +1,16 @@
+[alias]
+	co = checkout
+	cm = commit
+	st = status
+	br = branch
+	ac = !git add -A && git commit
+	ame = commit --amend --no-edit
+	branches = branch -a
+	tags = tag -l
+  fe = fetch
+	fp = fetch --prune
+	undo = reset HEAD~1 --mixed
+  unstage = reset HEAD -- .
+
+[include]
+	path = ~/.gitconfig.local
