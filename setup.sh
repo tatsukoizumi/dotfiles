@@ -21,8 +21,8 @@ ln -snfv ./dotfiles/zsh/.zshrc $HOME/.zshrc
 ln -snfv ./dotfiles/git/.gitconfig $HOME/.gitconfig
 
 # Create ghostty config directory and symlink
-mkdir -p "$HOME/Library/Application Support/com.mitchellh.ghostty"
-ln -snfv "$THIS_DIR/ghostty/config" "$HOME/Library/Application Support/com.mitchellh.ghostty/config"
+mkdir -p $HOME/.config/ghostty
+ln -snfv "$THIS_DIR/ghostty/config" "$HOME/.config/ghostty/config"
 
 echo "symbolic link created"
 
