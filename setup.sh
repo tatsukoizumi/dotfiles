@@ -8,7 +8,7 @@ echo "start setup..."
 # Install Homebrew packages
 if command -v brew &> /dev/null; then
   echo "Installing Homebrew packages..."
-  brew bundle --file=$THIS_DIR/Brewfile
+  brew bundle --file=$THIS_DIR/brew/Brewfile
 else
   echo "Homebrew is not installed. Please install Homebrew first."
   echo "Visit: https://brew.sh"

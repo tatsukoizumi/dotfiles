@@ -14,5 +14,5 @@ sh setup.sh
 ### update Brewfile
 
 ```sh
-sh update-brew.sh
+sh brew/update-brew.sh
 ```
