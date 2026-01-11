@@ -1,0 +1,8 @@
+[tools]
+aws = "latest"
+node = "24"
+pnpm = "latest"
+python = "3"
+
+[env]
+ENHANCD_FILTER = "peco"

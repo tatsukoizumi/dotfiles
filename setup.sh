@@ -24,6 +24,10 @@ ln -snfv ./dotfiles/git/.gitconfig $HOME/.gitconfig
 mkdir -p $HOME/.config/ghostty
 ln -snfv "$THIS_DIR/ghostty/config" "$HOME/.config/ghostty/config"
 
+# Create mise config directory and symlink
+mkdir -p $HOME/.config/mise
+ln -snfv "$THIS_DIR/mise/config.toml" "$HOME/.config/mise/config.toml"
+
 echo "symbolic link created"
 
 touch $HOME/.zshrc.local # to write zsh settings only for local
@@ -33,6 +37,12 @@ if [ ! -f $HOME/.gitconfig.local ]; then
   echo "Creating .gitconfig.local from template..."
   cp $THIS_DIR/git/.gitconfig.local.template $HOME/.gitconfig.local
   echo "Please edit ~/.gitconfig.local with your personal information"
+fi
+
+# Install tools via mise
+if command -v mise &> /dev/null; then
+  echo "Installing tools via mise..."
+  mise i
 fi
 
 echo "setup done!"
