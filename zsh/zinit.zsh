@@ -23,6 +23,5 @@ zinit light-mode for \
 
 zinit ice depth=1; zinit light romkatv/powerlevel10k
 zinit light zsh-users/zsh-autosuggestions
-zinit light marlonrichert/zsh-autocomplete
 zinit light mollifier/anyframe
-zinit ice wait'1' lucid pick'init.sh'; zinit light "b4b4r07/enhancd"
+zinit ice wait'1' lucid pick'init.sh' atload'compdef _cd __enhancd::cd'; zinit light "b4b4r07/enhancd"

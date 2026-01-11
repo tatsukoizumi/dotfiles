@@ -12,6 +12,8 @@ setopt extended_history
 setopt hist_expire_dups_first
 
 autoload -Uz colors; colors
+autoload -Uz compinit
+compinit -u
 
 zstyle ':completion:*:default' menu select=2
 zstyle ':completion:*' matcher-list '' 'm:{[:lower:]}={[:upper:]}' '+m:{[:upper:]}={[:lower:]}'
