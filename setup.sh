@@ -18,7 +18,11 @@ cd $HOME
 
 # Create symbolic links
 ln -snfv ./dotfiles/zsh/.zshrc $HOME/.zshrc
-ln -snfv ./dotfiles/.gitconfig $HOME/.gitconfig
+ln -snfv ./dotfiles/git/.gitconfig $HOME/.gitconfig
+
+# Create ghostty config directory and symlink
+mkdir -p "$HOME/Library/Application Support/com.mitchellh.ghostty"
+ln -snfv "$THIS_DIR/ghostty/config" "$HOME/Library/Application Support/com.mitchellh.ghostty/config"
 
 echo "symbolic link created"
 
@@ -27,7 +31,7 @@ touch $HOME/.zshrc.local # to write zsh settings only for local
 # Create .gitconfig.local from template if it doesn't exist
 if [ ! -f $HOME/.gitconfig.local ]; then
   echo "Creating .gitconfig.local from template..."
-  cp $THIS_DIR/.gitconfig.local.template $HOME/.gitconfig.local
+  cp $THIS_DIR/git/.gitconfig.local.template $HOME/.gitconfig.local
   echo "Please edit ~/.gitconfig.local with your personal information"
 fi
 
