@@ -18,6 +18,7 @@ cd $HOME
 
 # Create symbolic links
 ln -snfv ./dotfiles/zsh/.zshrc $HOME/.zshrc
+ln -snfv ./dotfiles/zsh/.p10k.zsh $HOME/.p10k.zsh
 ln -snfv ./dotfiles/git/.gitconfig $HOME/.gitconfig
 
 # Create ghostty config directory and symlink
