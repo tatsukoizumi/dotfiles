@@ -6,4 +6,4 @@ source $DOTFILES/zsh/zinit.zsh
 source $DOTFILES/zsh/p10k.zsh
 source $DOTFILES/zsh/path.zsh
 source $DOTFILES/zsh/alias.zsh
-source $DOTFILES/zsh/mise.sh
+source $DOTFILES/zsh/mise.zsh
