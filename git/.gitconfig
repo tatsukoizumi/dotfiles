@@ -10,6 +10,7 @@
   f = fetch --prune
   undo = reset HEAD~1 --mixed
   unstage = reset HEAD -- .
+  wt = worktree
 
 [push]
   default = current
