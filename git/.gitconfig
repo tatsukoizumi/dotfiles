@@ -4,6 +4,8 @@
   cm = commit
   st = status
   br = branch
+  pl = pull
+  ps = push
   ac = !git add -A && git commit
   ame = commit --amend --no-edit
   branches = branch -a
