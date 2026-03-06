@@ -29,6 +29,10 @@ ln -snfv "$THIS_DIR/ghostty/config" "$HOME/.config/ghostty/config"
 mkdir -p $HOME/.config/mise
 ln -snfv "$THIS_DIR/mise/config.toml" "$HOME/.config/mise/config.toml"
 
+# Create karabiner config directory and symlink
+mkdir -p $HOME/.config/karabiner
+ln -snfv "$THIS_DIR/karabiner/karabiner.json" "$HOME/.config/karabiner/karabiner.json"
+
 echo "symbolic link created"
 
 touch $HOME/.zshrc.local # to write zsh settings only for local
