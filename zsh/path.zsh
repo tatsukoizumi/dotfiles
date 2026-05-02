@@ -6,6 +6,7 @@ export PATH=$PATH:$GOPATH/bin
 export PATH=/opt/homebrew/bin:$PATH
 export PATH="$HOME/.local/share/mise/shims:$PATH"
 export PATH="$HOME/.local/bin:$PATH"
+export PATH="$PATH:/Applications/Obsidian.app/Contents/MacOS"
 
 # pnpm
 export PNPM_HOME="/Users/koizumitatsunori/Library/pnpm"
