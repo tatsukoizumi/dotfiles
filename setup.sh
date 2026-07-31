@@ -44,6 +44,9 @@ if [ ! -f $HOME/.gitconfig.local ]; then
   echo "Please edit ~/.gitconfig.local with your personal information"
 fi
 
+# Set up Claude Code config
+sh $THIS_DIR/claude/setup-claude.sh
+
 # Install tools via mise
 if command -v mise &> /dev/null; then
   echo "Installing tools via mise..."
