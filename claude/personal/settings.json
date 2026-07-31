@@ -1,5 +1,6 @@
 {
   "permissions": { "defaultMode": "auto" },
+  "attribution": { "commit": "", "pr": "", "sessionUrl": false },
   "model": "opus[1m]",
   "tui": "fullscreen",
   "remoteControlAtStartup": true,
