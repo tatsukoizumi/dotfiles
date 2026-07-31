@@ -12,6 +12,10 @@ setopt extended_history
 setopt hist_expire_dups_first
 
 autoload -Uz colors; colors
+
+# Docker CLI completions
+[ -d "$HOME/.docker/completions" ] && fpath=($HOME/.docker/completions $fpath)
+
 autoload -Uz compinit
 compinit -u
 
