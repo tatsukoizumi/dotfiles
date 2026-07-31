@@ -2,6 +2,7 @@
 node = "24"
 python = "3.13.1"
 deno = "latest"
+uv = "0.11.19"
 
 [env]
 ENHANCD_FILTER = "peco"
