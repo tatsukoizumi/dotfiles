@@ -2,7 +2,7 @@
 
 > キーワード: MUST / NEVER = 必須。SHOULD = 明確な理由がない限り従う。MAY = 任意。
 
-共通ルールは `~/.claude/rules/` に分割している（git / workflow / package-manager / language / writing、TS・Python はファイルに触れたとき遅延ロード）。
+共通ルールは `~/.claude/rules/` に分割している（git / workflow / package-manager / language / writing / comments、TS・Python はファイルに触れたとき遅延ロード）。
 
 ## 新規プロジェクトの既定
 
