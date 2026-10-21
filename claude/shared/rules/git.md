@@ -2,7 +2,7 @@
 
 - 指示を待たずに適宜コミットする。作業が論理的な区切り（機能・修正・リファクタ単位）に達したらその都度コミットし、まとめて1コミットにしない（MUST）
 - コミット手順は /koizumi:commit に従う。保護ブランチ上なら先にブランチを切る（MUST）
-- 明示的な指示なしに `git push` しない（NEVER）
+- 作業ブランチへの `git push` は確認なしで行う。force push はしない（NEVER）
 - `git add -A` / `git add .` を使わない。変更ファイルをパス指定でステージする（NEVER）
 - `--no-verify` / `--amend` / `--no-gpg-sign` を使わない。全コミットは 1Password で SSH 署名されるため `--no-gpg-sign` は特に厳禁。フック失敗時は修正して新規コミットする（NEVER）
 - secrets（`.env*`, `*.key`, `credentials.*`, 秘密鍵）や巨大バイナリはステージしない。混入しかけたら停止して報告する（MUST）
