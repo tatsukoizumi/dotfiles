@@ -12,3 +12,6 @@ source $HOME/.zshrc.local
 # Android SDK (Java は mise の java@17 を使用)
 export ANDROID_HOME="$HOME/Library/Android/sdk"
 export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
+
+# Vite+ bin (https://viteplus.dev)
+. "/Users/koizumitatsunori/.config/vite-plus/env"
