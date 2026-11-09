@@ -21,6 +21,10 @@ ln -snfv ./dotfiles/zsh/.zshrc $HOME/.zshrc
 ln -snfv ./dotfiles/zsh/.p10k.zsh $HOME/.p10k.zsh
 ln -snfv ./dotfiles/git/.gitconfig $HOME/.gitconfig
 
+# Link personal scripts into PATH
+mkdir -p $HOME/.local/bin
+ln -snfv "$THIS_DIR/bin/fleet" "$HOME/.local/bin/fleet"
+
 # Create ghostty config directory and symlink
 mkdir -p $HOME/.config/ghostty
 ln -snfv "$THIS_DIR/ghostty/config" "$HOME/.config/ghostty/config"

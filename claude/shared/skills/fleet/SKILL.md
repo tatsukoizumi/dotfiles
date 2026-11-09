@@ -1,0 +1,63 @@
+---
+name: fleet
+description: 代表エージェントから各リポジトリの Claude（Herdr pane 常駐）に作業を投げ、状態と報告を回収する。
+argument-hint: "<リポジトリ> <依頼内容>"
+---
+
+# /fleet
+
+ハブ（workspace `entry`）の Claude が、各リポジトリの pane で動く Claude に作業を委譲するための手順。
+操作は `fleet` コマンドに集約してある。`herdr` を直接叩くのは `fleet` で足りないときだけにする。
+
+## 使う前の確認
+
+1. `$HERDR_WORKSPACE_ID` が `entry` workspace か確認する。違う場合（= リポジトリ側の agent として動いている）はこの skill を使わず、自分で作業する。孫への再委譲はしない
+2. 依頼先が今いるリポジトリ自身なら委譲しない。自分でやる
+
+## 投げる
+
+```bash
+fleet targets                      # 候補・workspace・agent 状態（JSON）
+fleet send <target> --prompt '...'  # workspace と agent を用意して投入（非同期）
+```
+
+`send` は `ensure` を内包するので、workspace が無ければ作り、agent が居なければ起動し、既存の idle agent があれば再利用して slug 名を付ける。アクティブなリポジトリだけ workspace を持つ運用なので、事前に全リポジトリを用意したりはしない。
+
+- target は slug / workspace ラベル / `~` からの相対パス / 絶対パスで指定する
+- `ターゲットが曖昧` （終了コード 3）で候補が返ったら、**推測せずユーザーに確認する**
+- 複数リポジトリへ投げるときは `fleet send` を並べて実行する。待たない
+- 完了まで待つ必要があるときだけ `--wait [--timeout MS]` を付ける
+- 本体と切り離したいときだけ `--branch <name>` で worktree workspace を使う
+- プロンプトが長い・改行を含むなら `--prompt-file` か `-`（標準入力）を使う
+
+依頼本文には「何を達成したいか」と受け入れ条件を書く。`fleet` が運用ルール（作業ディレクトリ、報告先、自律範囲）を自動で添えるので、それを手で書き足さない。
+
+## 子 agent の自律範囲
+
+`fleet` が添える契約で、子 agent は **実装とコミットまで自律的に進める**。push・PR 作成・外部サービスへの変更はしない。必要なら report に「要指示」として書いて止まる。
+これを変えたいときは依頼本文に明示する（例: 「調査だけして変更しない」「push まで済ませる」）。
+
+## 回収する
+
+```bash
+fleet status            # 全 agent の状態 + report の到着状況
+fleet report <target>   # 最新 report を読む
+```
+
+子の回答は pane からは読み取れない（Claude Code は代替スクリーンで動くため）。回収は必ず report ファイル経由で行う。`fleet status` の `reports_unread` に出たものを `fleet report` で読む。
+
+`blocked` は承認待ちか質問待ち。**勝手に答えない。** `herdr agent read <agent名>` で何を聞かれているか確認し、ユーザーに判断を仰ぐ。
+
+report に「要確認」「要指示」があればユーザーに取り次ぐ。続きを頼むときは同じ target に `fleet send` を投げ直す（会話は継続する）。
+
+## ユーザーへの報告
+
+report を貼り付け直さない。リポジトリごとに「何が終わったか / 判断を待っているもの / 残課題」を数行でまとめ、詳細が必要なときに report のパスを示す。
+
+## プロファイル
+
+親ディレクトリによって direnv が Claude プロファイル（`CLAUDE_CONFIG_DIR`）と GitHub アカウント（`GH_CONFIG_DIR`）を切り替える。`fleet ensure` / `fleet send` の出力の `profile` が `default` 以外なら、そのリポジトリは別プロファイル・別アカウントで動いている。ハブ側から `gh auth switch` をしない（グローバルに効いて他のリポジトリを壊す）。
+
+## 片付け
+
+作業が終わって不要になった workspace は `fleet close <target>` で閉じる。`fleet` が作ったものだけが対象で、それ以外は `--force` が必要。**ユーザーの明示指示がない限り閉じない。**
