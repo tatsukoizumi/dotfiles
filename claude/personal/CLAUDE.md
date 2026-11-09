@@ -16,7 +16,7 @@
 手作業よりこれらを優先する:
 
 - コミット → /koizumi:commit
-- PR 作成 → /koizumi:pr
+- PR 作成 → /koizumi:pr（PR の上に積む連続した PR は gh-stack で Stacked PR にする）
 - コードレビュー・セキュリティ → /code-review, /review, /security-review
 
 ## クライアント・ディレクトリ別ルール
