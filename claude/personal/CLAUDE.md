@@ -17,7 +17,6 @@
 
 - コミット → /commit
 - PR 作成 → /pr
-- 複数チケットの並行実装 → /parallel-tickets
 - コードレビュー・セキュリティ → /code-review, /review, /security-review
 
 ## クライアント・ディレクトリ別ルール
