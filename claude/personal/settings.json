@@ -1,103 +1,109 @@
 {
-  "permissions": {
-    "defaultMode": "auto"
-  },
   "attribution": {
     "commit": "",
     "pr": "",
     "sessionUrl": false
   },
-  "model": "opus[1m]",
-  "tui": "fullscreen",
-  "remoteControlAtStartup": true,
-  "agentPushNotifEnabled": true,
-  "skipAutoPermissionPrompt": true,
+  "permissions": {
+    "defaultMode": "auto"
+  },
+  "model": "fable",
   "hooks": {
     "Notification": [
       {
+        "matcher": "permission_prompt",
         "hooks": [
           {
-            "async": true,
+            "type": "command",
             "command": "'/Users/koizumitatsunori/.local/bin/moshi-hook' claude-hook",
-            "type": "command"
+            "async": true
           }
-        ],
-        "matcher": "permission_prompt"
+        ]
       }
     ],
     "PermissionRequest": [
       {
         "hooks": [
           {
-            "async": false,
+            "type": "command",
             "command": "'/Users/koizumitatsunori/.local/bin/moshi-hook' claude-hook",
-            "type": "command"
+            "async": false
           }
         ]
       }
     ],
     "PostToolUse": [
       {
+        "matcher": "AskUserQuestion",
         "hooks": [
           {
-            "async": true,
+            "type": "command",
             "command": "'/Users/koizumitatsunori/.local/bin/moshi-hook' claude-hook",
-            "type": "command"
+            "async": true
           }
-        ],
-        "matcher": "AskUserQuestion"
+        ]
       },
       {
+        "matcher": "ExitPlanMode",
         "hooks": [
           {
-            "async": true,
+            "type": "command",
             "command": "'/Users/koizumitatsunori/.local/bin/moshi-hook' claude-hook",
-            "type": "command"
+            "async": true
           }
-        ],
-        "matcher": "ExitPlanMode"
+        ]
       }
     ],
     "PreToolUse": [
       {
+        "matcher": "AskUserQuestion",
         "hooks": [
           {
-            "async": true,
+            "type": "command",
             "command": "'/Users/koizumitatsunori/.local/bin/moshi-hook' claude-hook",
-            "type": "command"
+            "async": true
           }
-        ],
-        "matcher": "AskUserQuestion"
+        ]
       },
       {
+        "matcher": "ExitPlanMode",
         "hooks": [
           {
-            "async": true,
+            "type": "command",
             "command": "'/Users/koizumitatsunori/.local/bin/moshi-hook' claude-hook",
-            "type": "command"
+            "async": true
           }
-        ],
-        "matcher": "ExitPlanMode"
+        ]
       }
     ],
     "SessionEnd": [
       {
         "hooks": [
           {
-            "async": true,
+            "type": "command",
             "command": "'/Users/koizumitatsunori/.local/bin/moshi-hook' claude-hook",
-            "type": "command"
+            "async": true
           }
         ]
       }
     ],
     "SessionStart": [
       {
+        "matcher": "*",
         "hooks": [
           {
-            "async": true,
+            "type": "command",
+            "command": "bash '/Users/koizumitatsunori/.claude/hooks/herdr-agent-state.sh' session",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
             "command": "'/Users/koizumitatsunori/.local/bin/moshi-hook' claude-hook",
-            "type": "command"
+            "async": true
           }
         ]
       }
@@ -106,9 +112,9 @@
       {
         "hooks": [
           {
-            "async": true,
+            "type": "command",
             "command": "'/Users/koizumitatsunori/.local/bin/moshi-hook' claude-hook",
-            "type": "command"
+            "async": true
           }
         ]
       }
@@ -117,12 +123,38 @@
       {
         "hooks": [
           {
-            "async": true,
+            "type": "command",
             "command": "'/Users/koizumitatsunori/.local/bin/moshi-hook' claude-hook",
-            "type": "command"
+            "async": true
           }
         ]
       }
     ]
-  }
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "bash /Users/koizumitatsunori/.claude/statusline-command.sh"
+  },
+  "enabledPlugins": {
+    "koizumi@koizumi-dotfiles": true,
+    "slack@claude-plugins-official": true
+  },
+  "extraKnownMarketplaces": {
+    "koizumi-dotfiles": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/koizumitatsunori/dotfiles"
+      }
+    }
+  },
+  "tui": "fullscreen",
+  "voice": {
+    "enabled": true,
+    "mode": "hold"
+  },
+  "skipWorkflowUsageWarning": true,
+  "remoteControlAtStartup": true,
+  "agentPushNotifEnabled": true,
+  "skipAutoPermissionPrompt": true,
+  "voiceEnabled": true
 }
