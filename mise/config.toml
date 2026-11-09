@@ -4,6 +4,7 @@ python = "3.13.1"
 deno = "latest"
 uv = "0.11.19"
 aws = { version = "2.32.32", symlink_bins = "true" }
+java = "17"
 
 [env]
 ENHANCD_FILTER = "peco"
