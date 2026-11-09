@@ -18,6 +18,7 @@
 - コミット → /koizumi:commit
 - PR 作成 → /koizumi:pr（PR の上に積む連続した PR は gh-stack で Stacked PR にする）
 - コードレビュー・セキュリティ → /code-review, /review, /security-review
+- 別リポジトリでの作業（代表 agent から各リポジトリの agent へ委譲）→ /koizumi:fleet
 
 ## クライアント・ディレクトリ別ルール
 
