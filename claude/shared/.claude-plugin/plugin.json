@@ -1,0 +1,11 @@
+{
+  "name": "koizumi",
+  "displayName": "koizumi workflow",
+  "description": "commit / pr / fleet の個人用ワークフロー",
+  "version": "0.1.0",
+  "author": {
+    "name": "tatsukoizumi"
+  },
+  "repository": "https://github.com/tatsukoizumi/dotfiles",
+  "keywords": ["workflow", "git"]
+}

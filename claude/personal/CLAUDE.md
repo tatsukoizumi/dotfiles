@@ -15,8 +15,8 @@
 
 手作業よりこれらを優先する:
 
-- コミット → /commit
-- PR 作成 → /pr
+- コミット → /koizumi:commit
+- PR 作成 → /koizumi:pr
 - コードレビュー・セキュリティ → /code-review, /review, /security-review
 
 ## クライアント・ディレクトリ別ルール

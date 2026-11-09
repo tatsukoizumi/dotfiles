@@ -1,0 +1,13 @@
+{
+  "name": "koizumi-dotfiles",
+  "description": "tatsukoizumi の個人用 Claude Code plugin",
+  "owner": {
+    "name": "tatsukoizumi"
+  },
+  "plugins": [
+    {
+      "name": "koizumi",
+      "source": "./claude/shared"
+    }
+  ]
+}
