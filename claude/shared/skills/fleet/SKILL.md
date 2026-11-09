@@ -9,15 +9,22 @@ argument-hint: "<リポジトリ> <依頼内容>"
 ハブ（workspace `entry`）の Claude が、各リポジトリの pane で動く Claude に作業を委譲するための手順。
 操作は `fleet` コマンドに集約してある。`herdr` を直接叩くのは `fleet` で足りないときだけにする。
 
-## 使う前の確認
+## ハブと担当範囲
 
-1. `$HERDR_WORKSPACE_ID` が `entry` workspace か確認する。違う場合（= リポジトリ側の agent として動いている）はこの skill を使わず、自分で作業する。孫への再委譲はしない
-2. 依頼先が今いるリポジトリ自身なら委譲しない。自分でやる
+ハブはラベルが `entry`（個人）または `<root>/entry`（クライアントごと）の workspace。`fleet` はハブ以外では動かない。リポジトリ側の agent として動いているときはこの skill を使わず、自分で作業する。孫への再委譲はしない。
+
+各ハブは自分の root 配下にしか投げられない。`<root>/entry` のハブはその root 専用、`entry` のハブは他のハブが持っていない root をすべて担当する。担当外のターゲットは `fleet` が拒否する（終了コード 8）。そのときは**自分で回り込まず、正しいハブをユーザーに案内する**。クライアントの業務内容をハブのコンテキストに混ぜないための境界なので、`--any-scope` で越えない。
+
+```bash
+fleet scope    # このハブの担当範囲と、他のハブが持つ root
+```
+
+依頼先が今いるリポジトリ自身なら委譲しない。自分でやる。
 
 ## 投げる
 
 ```bash
-fleet targets                      # 候補・workspace・agent 状態（JSON）
+fleet targets                      # 担当範囲の候補・workspace・agent 状態（JSON）
 fleet send <target> --prompt '...'  # workspace と agent を用意して投入（非同期）
 ```
 
@@ -57,6 +64,8 @@ report を貼り付け直さない。リポジトリごとに「何が終わっ�
 ## プロファイル
 
 親ディレクトリによって direnv が Claude プロファイル（`CLAUDE_CONFIG_DIR`）と GitHub アカウント（`GH_CONFIG_DIR`）を切り替える。`fleet ensure` / `fleet send` の出力の `profile` が `default` 以外なら、そのリポジトリは別プロファイル・別アカウントで動いている。ハブ側から `gh auth switch` をしない（グローバルに効いて他のリポジトリを壊す）。
+
+`.envrc` を変更した場合、既に起動している agent の環境は古いままになる。`profile` が期待と違うと報告されたら、その pane で Claude を終了して `claude --continue` で再開するようユーザーに伝える。
 
 ## 片付け
 

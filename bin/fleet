@@ -3,6 +3,10 @@
 set -euo pipefail
 
 STATE=${FLEET_STATE:-$HOME/.local/state/fleet}
+HUB_LABEL=''
+HUB_SCOPE=''
+ANY_SCOPE=false
+SHOW_ALL=false
 WAIT_TIMEOUT_DEFAULT=900000
 START_TIMEOUT=120000
 
@@ -41,7 +45,8 @@ index() {
                           // ($aw[.workspace_id] // [] | map(.cwd) | first)
                           // ($pw[.workspace_id] // [] | map(.cwd) | group_by(.) | max_by(length) | .[0]))})
            | map(select(.path != null))) as $ws2
-    | ( ($ws2 | map({path, label, workspace_id, number, worktree: (.worktree != null)}))
+    | ( ($ws2 | map({path, label, workspace_id, number, worktree: (.worktree != null),
+                     repo_root: .worktree.repo_root}))
       + ($repos | map({path: ., label: null, workspace_id: null})) ) as $all
     | ($all | group_by(.path)
             | map(reduce .[] as $e ({}; . * ($e | with_entries(select(.value != null)))))
@@ -60,11 +65,13 @@ index() {
         | $t + {
             slug: $slug,
             rel: (rel($t.path) | if . == "" then "~" else . end),
-            root: ($seg | if length > 1 then .[0] else "" end),
+            root: ((rel($t.repo_root // $t.path) | split("/"))
+                   | if length > 1 then .[0] else "" end),
             agent: (if $a then {name: ($a.name // null), kind: $a.agent, pane_id: $a.pane_id,
                                 status: $a.agent_status, title: $a.terminal_title_stripped} else null end),
             active: ($t.workspace_id != null)
           })
+    | map(select((.label // "") | (. != "entry" and (endswith("/entry") | not))))
     | sort_by([(if .active then 0 else 1 end), .rel])'
 }
 
@@ -102,6 +109,52 @@ profile_of() {
       gh_config_dir: (if $ghd == "" then "default" else $ghd end)}'
 }
 
+# --- hub scope ------------------------------------------------------------
+
+claimed_roots() {
+  herdr workspace list \
+    | jq -r '.result.workspaces[].label // "" | select(endswith("/entry")) | sub("/entry$"; "")'
+}
+
+require_hub() {
+  HUB_LABEL=$(herdr workspace get "${HERDR_WORKSPACE_ID:-}" 2>/dev/null \
+    | jq -r '.result.workspace.label // ""')
+  case "$HUB_LABEL" in
+    entry) HUB_SCOPE='' ;;
+    */entry) HUB_SCOPE=${HUB_LABEL%/entry} ;;
+    *) die "ここはハブ workspace ではない（label=${HUB_LABEL:-なし}）。fleet はラベルが entry か <root>/entry の workspace から使う" 8 ;;
+  esac
+}
+
+scope_hint() {
+  if [ -n "$1" ] && claimed_roots | grep -qxF "$1"; then printf '%s/entry' "$1"; else printf 'entry'; fi
+}
+
+in_scope() {
+  local r=$1
+  if [ -n "$HUB_SCOPE" ]; then [ "$r" = "$HUB_SCOPE" ]; return; fi
+  [ -n "$r" ] || return 0
+  ! claimed_roots | grep -qxF "$r"
+}
+
+scope_filter() {
+  local claimed
+  if [ "$SHOW_ALL" = true ]; then cat; return; fi
+  claimed=$(claimed_roots | jq -R . | jq -sc .)
+  jq -c --arg scope "$HUB_SCOPE" --argjson claimed "$claimed" \
+    'map(select(. as $e
+                | if $scope != "" then $e.root == $scope
+                  else ($e.root == "" or ($claimed | index($e.root) | not)) end))'
+}
+
+scope_cmd() {
+  jq -nc --arg label "$HUB_LABEL" --arg scope "$HUB_SCOPE" \
+         --argjson claimed "$(claimed_roots | jq -R . | jq -sc .)" \
+         --argjson targets "$(index | scope_filter | jq 'length')" \
+    '{hub: $label, scope: (if $scope == "" then "個人（他ハブが持つ root を除く全体）" else $scope end),
+      claimed_roots: $claimed, targets_in_scope: $targets}'
+}
+
 # --- ensure ---------------------------------------------------------------
 
 free_shell_pane() {
@@ -134,6 +187,9 @@ ensure() {
   label=$(jq -r '.label // .rel' <<<"$t"); ws=$(jq -r '.workspace_id // empty' <<<"$t")
   [ -z "$ws" ] || [ "$ws" != "${HERDR_WORKSPACE_ID:-}" ] \
     || die "自分自身（ハブの workspace）はターゲットにできない: $slug" 2
+  local troot; troot=$(jq -r .root <<<"$t")
+  [ "$ANY_SCOPE" = true ] || in_scope "$troot" \
+    || die "ハブ ${HUB_LABEL} の担当外: ${slug}（root=${troot:-~}）。$(scope_hint "$troot") のハブから投げる" 8
 
   if [ -z "$ws" ]; then
     local res
@@ -243,7 +299,7 @@ status() {
   idx=$(index) || exit $?
   if [ -n "${1:-}" ]; then targets="[$(resolve "$1" "$idx" || exit $?)]"
   else targets=$(jq -c --arg hub "${HERDR_WORKSPACE_ID:-}" \
-    'map(select(.active and .agent != null and .workspace_id != $hub))' <<<"$idx"); fi
+    'map(select(.active and .agent != null and .workspace_id != $hub))' <<<"$idx" | scope_filter); fi
 
   for slug in $(jq -r '.[].slug' <<<"$targets"); do
     f="$STATE/dispatch/$slug.json"
@@ -304,10 +360,11 @@ usage() {
   cat <<'EOF'
 fleet — Herdr 上の各リポジトリ agent にハブから作業を投げる
 
-  fleet targets                        候補と現在の workspace/agent を JSON で出す
+  fleet scope                          このハブの担当範囲を出す
+  fleet targets [--all]                候補と現在の workspace/agent を JSON で出す
   fleet ensure <target> [--branch B]   workspace と claude agent を冪等に用意する
   fleet send <target> [opts]           報告契約付きでプロンプトを投入する
-  fleet status [target]                agent の状態をまとめて出す
+  fleet status [target] [--all]        agent の状態をまとめて出す
   fleet report <target> [--list]       最新 report を表示する
   fleet close <target> [--force]       fleet が作った workspace を閉じる
 
@@ -317,6 +374,10 @@ send のオプション:
   --branch B                               worktree workspace で作業する
 
 target は slug / workspace ラベル / ~ からの相対パス / 絶対パスで指定する。
+
+ハブはラベルが entry（個人）か <root>/entry（例 <client>/entry）の workspace。
+ハブは自分の root 配下のリポジトリにしか投げられない。担当外は正しいハブから投げる。
+--all は一覧の範囲外も表示する。--any-scope は投入の範囲チェックを外す（原則使わない）。
 EOF
 }
 
@@ -326,12 +387,23 @@ main() {
     help|-h|--help) usage; return ;;
   esac
   require_herdr
+  require_hub
   case "$cmd" in
-    targets) index ;;
+    scope) scope_cmd ;;
+    targets)
+      while [ $# -gt 0 ]; do
+        case $1 in --all) SHOW_ALL=true; shift ;; *) die "不明なオプション: $1" 2 ;; esac
+      done
+      index | scope_filter ;;
     ensure)
       local target='' branch=''
       while [ $# -gt 0 ]; do
-        case $1 in --branch) branch=$2; shift 2 ;; -*) die "不明なオプション: $1" 2 ;; *) target=$1; shift ;; esac
+        case $1 in
+          --branch) branch=$2; shift 2 ;;
+          --any-scope) ANY_SCOPE=true; shift ;;
+          -*) die "不明なオプション: $1" 2 ;;
+          *) target=$1; shift ;;
+        esac
       done
       ensure "$target" "$branch" ;;
     send)
@@ -344,13 +416,18 @@ main() {
           --wait) wait=true; shift ;;
           --timeout) timeout=$2; shift 2 ;;
           --branch) branch=$2; shift 2 ;;
+          --any-scope) ANY_SCOPE=true; shift ;;
           -*) die "不明なオプション: $1" 2 ;;
           *) target=$1; shift ;;
         esac
       done
       [ "$got" = true ] && [ -n "$prompt" ] || die 'プロンプトを --prompt / --prompt-file / - で渡す' 2
       send "$target" "$prompt" "$wait" "$timeout" "$branch" ;;
-    status) status "${1:-}" ;;
+    status)
+      while [ $# -gt 0 ]; do
+        case $1 in --all) SHOW_ALL=true; shift ;; -*) die "不明なオプション: $1" 2 ;; *) break ;; esac
+      done
+      status "${1:-}" ;;
     report)
       local target='' list=false
       while [ $# -gt 0 ]; do

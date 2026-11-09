@@ -5,3 +5,4 @@
 - 作成時は `--no-focus` を付ける。フォーカス移動はユーザーが求めたときだけ（MUST）
 - 既存 workspace のラベルを勝手に変更しない（NEVER）
 - 代表 agent から別リポジトリの agent へ作業を委譲するときは `fleet` コマンドと /koizumi:fleet に従う。`herdr` を直接叩くのは fleet で足りないときだけ（MUST）
+- ハブ workspace のラベルは `entry`（個人）または `<root>/entry`（クライアントごと）。ハブは自分の root 配下にしか作業を投げない（MUST）
