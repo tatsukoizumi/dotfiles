@@ -413,8 +413,9 @@ send のオプション:
 
 target は slug / workspace ラベル / ~ からの相対パス / 絶対パスで指定する。
 
-ハブはラベルが entry（個人）か <root>/entry（例 <client>/entry）の workspace。
-ハブは自分の root 配下のリポジトリにしか投げられない。担当外は正しいハブから投げる。
+ハブは entry workspace の各タブに置いた Claude。担当範囲はそのタブの cwd で決まり、
+~/<root> なら その root 専用、~ なら他のタブが持たない root すべてになる。
+~/.config/fleet/roots で、別の場所にあるルートを同じハブに寄せられる。
 --all は一覧の範囲外も表示する。--any-scope は投入の範囲チェックを外す（原則使わない）。
 EOF
 }
