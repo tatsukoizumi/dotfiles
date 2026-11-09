@@ -3,7 +3,9 @@
 set -euo pipefail
 
 STATE=${FLEET_STATE:-$HOME/.local/state/fleet}
-HUB_LABEL=''
+HUB_WS=${FLEET_HUB_WORKSPACE:-entry}
+ROOTS_CONF=${FLEET_ROOTS_CONF:-$HOME/.config/fleet/roots}
+HUB_TAB=''
 HUB_SCOPE=''
 ANY_SCOPE=false
 SHOW_ALL=false
@@ -34,7 +36,7 @@ index() {
   agents=$(herdr agent list | jq -c '.result.agents')
   repos=$(repo_paths | jq -R . | jq -sc .)
   jq -n --argjson ws "$ws" --argjson panes "$panes" --argjson agents "$agents" \
-        --argjson repos "$repos" --arg home "$HOME" '
+        --argjson repos "$repos" --arg home "$HOME" --arg hubws "${HERDR_WORKSPACE_ID:-}" '
     def slugify:
       ascii_downcase | gsub("[^a-z0-9_-]+"; "-") | gsub("^-+|-+$"; "") | .[0:32] | gsub("-+$"; "");
     def rel($p): if $p == $home then "" elif ($p | startswith($home + "/")) then $p[($home|length)+1:] else $p end;
@@ -71,7 +73,7 @@ index() {
                                 status: $a.agent_status, title: $a.terminal_title_stripped} else null end),
             active: ($t.workspace_id != null)
           })
-    | map(select((.label // "") | (. != "entry" and (endswith("/entry") | not))))
+    | map(select(.workspace_id != $hubws))
     | sort_by([(if .active then 0 else 1 end), .rel])'
 }
 
@@ -111,48 +113,84 @@ profile_of() {
 
 # --- hub scope ------------------------------------------------------------
 
-claimed_roots() {
-  herdr workspace list \
-    | jq -r '.result.workspaces[].label // "" | select(endswith("/entry")) | sub("/entry$"; "")'
+root_of() {
+  local p=$1 r
+  [ "$p" = "$HOME" ] && { printf '\n'; return; }
+  case "$p" in "$HOME"/*) r=${p#"$HOME"/}; printf '%s\n' "${r%%/*}" ;; *) printf '\n' ;; esac
+}
+
+owner_of() {
+  local r=$1 a b
+  [ -n "$r" ] || { printf '\n'; return; }
+  if [ -f "$ROOTS_CONF" ]; then
+    while read -r a b; do
+      case "$a" in ''|\#*) continue ;; esac
+      [ "$a" = "$r" ] || continue
+      printf '%s\n' "${b:-$r}"; return
+    done < "$ROOTS_CONF"
+  fi
+  printf '%s\n' "$r"
+}
+
+owner_map() {
+  if [ -f "$ROOTS_CONF" ]; then
+    jq -Rn --rawfile conf "$ROOTS_CONF" \
+      '$conf | split("\n") | map(select(test("^\\s*(#|$)") | not) | split(" +"; null))
+       | map({key: .[0], value: (if (.[1] // "") == "" then .[0] else .[1] end)}) | from_entries'
+  else printf '{}\n'; fi
 }
 
 require_hub() {
-  HUB_LABEL=$(herdr workspace get "${HERDR_WORKSPACE_ID:-}" 2>/dev/null \
-    | jq -r '.result.workspace.label // ""')
-  case "$HUB_LABEL" in
-    entry) HUB_SCOPE='' ;;
-    */entry) HUB_SCOPE=${HUB_LABEL%/entry} ;;
-    *) die "ここはハブ workspace ではない（label=${HUB_LABEL:-なし}）。fleet はラベルが entry か <root>/entry の workspace から使う" 8 ;;
-  esac
+  local wslabel cwd
+  wslabel=$(herdr workspace get "${HERDR_WORKSPACE_ID:-}" 2>/dev/null | jq -r '.result.workspace.label // ""')
+  [ "$wslabel" = "$HUB_WS" ] \
+    || die "ここはハブではない（workspace=${wslabel:-不明}）。fleet は $HUB_WS workspace のハブ pane から使う" 8
+  cwd=$(herdr pane get "${HERDR_PANE_ID:-}" 2>/dev/null | jq -r '.result.pane.cwd // ""')
+  HUB_TAB=$(herdr tab get "${HERDR_TAB_ID:-}" 2>/dev/null | jq -r '.result.tab.label // ""')
+  HUB_SCOPE=$(owner_of "$(root_of "$cwd")")
 }
 
-scope_hint() {
-  if [ -n "$1" ] && claimed_roots | grep -qxF "$1"; then printf '%s/entry' "$1"; else printf 'entry'; fi
+hub_roots() {
+  herdr agent list \
+    | jq -r --arg ws "${HERDR_WORKSPACE_ID:-}" '.result.agents[] | select(.workspace_id == $ws) | .cwd' \
+    | while read -r c; do owner_of "$(root_of "$c")"; done | sort -u | grep -v '^$' || true
 }
 
 in_scope() {
-  local r=$1
-  if [ -n "$HUB_SCOPE" ]; then [ "$r" = "$HUB_SCOPE" ]; return; fi
-  [ -n "$r" ] || return 0
-  ! claimed_roots | grep -qxF "$r"
+  local owner; owner=$(owner_of "$1")
+  if [ -n "$HUB_SCOPE" ]; then [ "$owner" = "$HUB_SCOPE" ]; return; fi
+  [ -n "$owner" ] || return 0
+  ! hub_roots | grep -qxF "$owner"
+}
+
+scope_hint() {
+  local owner; owner=$(owner_of "$1")
+  if [ -n "$owner" ] && hub_roots | grep -qxF "$owner"; then
+    printf '%s のハブタブ' "$owner"
+  else
+    printf '個人ハブ（cwd が ~ のタブ）'
+  fi
 }
 
 scope_filter() {
-  local claimed
+  local claimed map
   if [ "$SHOW_ALL" = true ]; then cat; return; fi
-  claimed=$(claimed_roots | jq -R . | jq -sc .)
-  jq -c --arg scope "$HUB_SCOPE" --argjson claimed "$claimed" \
-    'map(select(. as $e
-                | if $scope != "" then $e.root == $scope
-                  else ($e.root == "" or ($claimed | index($e.root) | not)) end))'
+  claimed=$(hub_roots | jq -R . | jq -sc .)
+  map=$(owner_map)
+  jq -c --arg scope "$HUB_SCOPE" --argjson claimed "$claimed" --argjson map "$map" \
+    'map(select(. as $e | ($map[$e.root] // $e.root) as $o
+                | if $scope != "" then $o == $scope
+                  else ($o == "" or ($claimed | index($o) | not)) end))'
 }
 
 scope_cmd() {
-  jq -nc --arg label "$HUB_LABEL" --arg scope "$HUB_SCOPE" \
-         --argjson claimed "$(claimed_roots | jq -R . | jq -sc .)" \
+  jq -nc --arg tab "$HUB_TAB" --arg scope "$HUB_SCOPE" \
+         --argjson claimed "$(hub_roots | jq -R . | jq -sc .)" \
+         --argjson map "$(owner_map)" \
          --argjson targets "$(index | scope_filter | jq 'length')" \
-    '{hub: $label, scope: (if $scope == "" then "個人（他ハブが持つ root を除く全体）" else $scope end),
-      claimed_roots: $claimed, targets_in_scope: $targets}'
+    '{hub_tab: $tab,
+      scope: (if $scope == "" then "個人（他のハブタブが持たない root すべて）" else $scope end),
+      hub_roots: $claimed, root_aliases: $map, targets_in_scope: $targets}'
 }
 
 # --- ensure ---------------------------------------------------------------
@@ -189,7 +227,7 @@ ensure() {
     || die "自分自身（ハブの workspace）はターゲットにできない: $slug" 2
   local troot; troot=$(jq -r .root <<<"$t")
   [ "$ANY_SCOPE" = true ] || in_scope "$troot" \
-    || die "ハブ ${HUB_LABEL} の担当外: ${slug}（root=${troot:-~}）。$(scope_hint "$troot") のハブから投げる" 8
+    || die "このハブ（${HUB_TAB:-個人}）の担当外: ${slug}（root=${troot:-~}）。$(scope_hint "$troot")から投げる" 8
 
   if [ -z "$ws" ]; then
     local res
