@@ -11,6 +11,8 @@ ANY_SCOPE=false
 SHOW_ALL=false
 KIND=${FLEET_KIND:-claude}
 MODEL=${FLEET_MODEL:-}
+CLOUD=false
+CLOUD_DESC=
 WAIT_TIMEOUT_DEFAULT=900000
 START_TIMEOUT=120000
 
@@ -239,6 +241,8 @@ ensure() {
   [ -n "$t" ] || die "ターゲットを解決できなかった: $target" 3
   path=$(jq -r .path <<<"$t"); slug=$(jq -r .slug <<<"$t")
   label=$(jq -r '.label // .rel' <<<"$t"); ws=$(jq -r '.workspace_id // empty' <<<"$t")
+  command -v "$KIND" >/dev/null \
+    || die "agent kind '${KIND}' の実行ファイルが PATH に無い。herdr integration status で導入状況を見る" 9
   [ -z "$ws" ] || [ "$ws" != "${HERDR_WORKSPACE_ID:-}" ] \
     || die "自分自身（ハブの workspace）はターゲットにできない: $slug" 2
   local troot; troot=$(jq -r .root <<<"$t")
@@ -275,8 +279,6 @@ ensure() {
   fi
 
   slug=$(agent_name_for "$slug" "$KIND")
-  command -v "$KIND" >/dev/null \
-    || die "agent kind '${KIND}' の実行ファイルが PATH に無い。herdr integration status で導入状況を見る" 9
   local existing_agent
   existing_agent=$(herdr agent list \
     | jq -c --arg ws "$ws" --arg kind "$KIND" \
@@ -314,7 +316,63 @@ ensure() {
       model: (if $model == "" then null else $model end), profile: $profile}'
 }
 
+# --- cloud ----------------------------------------------------------------
+
+# claude --cloud はセッションを作って即終了する。pane には residents しないので
+# herdr の agent にはならない。依頼本文は呼び出し側がセッションへ直接送る。
+# --teleport は使わない（ローカルの作業ツリーのブランチを切り替えてしまう）。
+cloud_cmd() {
+  local target=$1 desc=$2 idx t path slug out sid url name
+  idx=$(index) || exit $?
+  t=$(resolve "$target" "$idx") || exit $?
+  path=$(jq -r .path <<<"$t"); slug=$(jq -r .slug <<<"$t")
+  local troot; troot=$(jq -r .root <<<"$t")
+  [ "$ANY_SCOPE" = true ] || in_scope "$troot" \
+    || die "このハブ（${HUB_TAB:-個人}）の担当外: ${slug}。$(scope_hint "$troot")から投げる" 8
+  command -v claude >/dev/null || die "claude が PATH に無い" 9
+  git -C "$path" remote get-url origin >/dev/null 2>&1 \
+    || die "クラウド実行はリモートからクローンするため origin が必要: ${path}" 10
+  [ -z "$(git -C "$path" status --porcelain 2>/dev/null)" ] \
+    || printf 'fleet: 警告 %s に未コミットの変更がある。クラウド側のクローンには反映されない\n' "$path" >&2
+  [ -n "$desc" ] || desc="$slug"
+
+  local -a args=(--cloud "$desc")
+  [ -z "$MODEL" ] || args+=(--model "$MODEL")
+  # claude --cloud は TTY を要求するので pty を割り当てて実行する
+  out=$(cd "$path" && script -q /dev/null claude "${args[@]}" 2>&1 \
+        | tr -d '\r' | sed -E $'s/\x1b\\[[0-9;?>]*[a-zA-Z]//g; s/[\x01-\x08\x0b\x0c\x0e-\x1f]//g') \
+    || die "クラウドセッションの作成に失敗した: $(head -2 <<<"$out")" 11
+  grep -q 'Created cloud session' <<<"$out" \
+    || die "クラウドセッションが作られなかった: $(grep -v '^$' <<<"$out" | head -3)" 11
+  sid=$(grep -oE 'session_[A-Za-z0-9]+' <<<"$out" | head -1)
+  url=$(grep -oE 'https://claude\.ai/code/[^ ?]+' <<<"$out" | head -1)
+  name=$(sed -n 's/.*Created cloud session: //p' <<<"$out" | head -1)
+  [ -n "$sid" ] || die "セッション ID を読み取れなかった: $(head -3 <<<"$out")" 11
+
+  mkdir -p "$STATE/dispatch"
+  jq -nc --arg slug "$slug" --arg path "$path" --arg sid "$sid" --arg url "$url" \
+         --arg name "$name" --arg model "$MODEL" --arg desc "$desc" \
+         --arg sent "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg contract "$(cloud_contract)" \
+    '{slug: $slug, cloud: true, path: $path, session_id: $sid, url: $url,
+      session_name: $name, model: (if $model == "" then null else $model end),
+      description: $desc, sent_at: $sent, contract: $contract}' \
+    | tee "$STATE/dispatch/${slug}.cloud.json"
+}
+
 # --- send -----------------------------------------------------------------
+
+cloud_contract() {
+  cat <<EOF
+
+---
+[fleet / 代表エージェントからの依頼（クラウド実行）]
+- 作業はクラウド上のクローンで行われる。ローカルのファイルには書けない
+- 完了したら変更をブランチに積み、PR を作って報告を PR 本文に書く。チャットへの最終応答は PR の URL だけにする
+- PR 本文には「やったこと / 変更の要点 / 品質ゲートの結果 / 残課題」を書く。差分の全列挙はしない
+- クラウド実行では PR が成果の受け渡し手段なので、push と PR 作成は許可されている
+- 判断を要して進められないときは PR を作らず、「要確認」として質問をチャットに1行で書いて止まる
+EOF
+}
 
 contract() {
   cat <<EOF
@@ -347,11 +405,17 @@ send() {
   fi
 
   ts=$(date -u +%Y%m%dT%H%M%SZ)
-  report="$STATE/reports/$(jq -r .slug <<<"$info")/$ts.md"
-  mkdir -p "$(dirname "$report")" "$STATE/dispatch"
+  mkdir -p "$STATE/dispatch"
 
   local full
-  full="$prompt$(contract "$report" "$path")"
+  if [ "$CLOUD" = true ]; then
+    report=''
+    full="$prompt$(cloud_contract)"
+  else
+    report="$STATE/reports/$(jq -r .slug <<<"$info")/$ts.md"
+    mkdir -p "$(dirname "$report")"
+    full="$prompt$(contract "$report" "$path")"
+  fi
   if [ "$wait" = true ]; then
     herdr agent prompt "$slug" "$full" --wait --timeout "$timeout" >/dev/null
   else
@@ -359,7 +423,7 @@ send() {
   fi
 
   jq -c --arg report "$report" --arg sent "$(date -u +%Y-%m-%dT%H:%M:%SZ)" --arg prompt "$prompt" \
-    '. + {report: $report, sent_at: $sent, prompt: $prompt}' <<<"$info" \
+    '. + {report: (if $report == "" then null else $report end), sent_at: $sent, prompt: $prompt}' <<<"$info" \
     | tee "$STATE/dispatch/$(jq -r .slug <<<"$info").json"
 }
 
@@ -401,8 +465,14 @@ report_cmd() {
   local target=$1 list=$2 idx t dir latest
   idx=$(index) || exit $?
   t=$(resolve "$target" "$idx") || exit $?
-  dir="$STATE/reports/$(jq -r .slug <<<"$t")"
-  [ -d "$dir" ] || die "report がまだない: $(jq -r .slug <<<"$t")" 6
+  local dslug; dslug=$(jq -r .slug <<<"$t")
+  if [ -f "$STATE/dispatch/${dslug}.cloud.json" ] && [ ! -d "$STATE/reports/${dslug}" ]; then
+    jq -r '"クラウド実行の依頼なので report ファイルは無い。\nセッション: \(.session_name) \(.url)\n成果は PR で返る: gh pr list"' \
+      "$STATE/dispatch/${dslug}.cloud.json" >&2
+    exit 6
+  fi
+  dir="$STATE/reports/${dslug}"
+  [ -d "$dir" ] || die "report がまだない: ${dslug}" 6
   if [ "$list" = true ]; then ls -1t "$dir"; return; fi
   latest=$(ls -1t "$dir" | head -1)
   [ -n "$latest" ] || die "report がまだない: $(jq -r .slug <<<"$t")" 6
@@ -432,6 +502,7 @@ usage() {
 fleet — Herdr 上の各リポジトリ agent にハブから作業を投げる
 
   fleet scope                          このハブの担当範囲を出す
+  fleet cloud <target> [説明]           クラウドセッションを作る（依頼本文は別途送る）
   fleet targets [--all]                候補と現在の workspace/agent を JSON で出す
   fleet ensure <target> [opts]         workspace と agent を冪等に用意する
   fleet send <target> [opts]           報告契約付きでプロンプトを投入する
@@ -453,6 +524,8 @@ target は slug / workspace ラベル / ~ からの相対パス / 絶対パス�
 ~/.config/fleet/roots で、別の場所にあるルートを同じハブに寄せられる。
 --all は一覧の範囲外も表示する。--any-scope は投入の範囲チェックを外す（原則使わない）。
 既定は FLEET_KIND / FLEET_MODEL で変えられる。claude 以外の kind は agent 名が <slug>-<kind> になる。
+fleet cloud はセッションを作るだけ。claude --cloud は pane に残らないので、依頼本文は
+作成後にセッションへ直接送る（出力の contract を本文に添える）。成果は PR で返る。
 EOF
 }
 
@@ -465,6 +538,18 @@ main() {
   require_hub
   case "$cmd" in
     scope) scope_cmd ;;
+    cloud)
+      local target='' desc=''
+      while [ $# -gt 0 ]; do
+        case $1 in
+          --model) MODEL=$2; shift 2 ;;
+          --desc) desc=$2; shift 2 ;;
+          --any-scope) ANY_SCOPE=true; shift ;;
+          -*) die "不明なオプション: $1" 2 ;;
+          *) if [ -z "$target" ]; then target=$1; else desc=$1; fi; shift ;;
+        esac
+      done
+      cloud_cmd "$target" "$desc" ;;
     targets)
       while [ $# -gt 0 ]; do
         case $1 in --all) SHOW_ALL=true; shift ;; *) die "不明なオプション: $1" 2 ;; esac
