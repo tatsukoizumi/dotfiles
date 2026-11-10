@@ -9,6 +9,8 @@ HUB_TAB=''
 HUB_SCOPE=''
 ANY_SCOPE=false
 SHOW_ALL=false
+KIND=${FLEET_KIND:-claude}
+MODEL=${FLEET_MODEL:-}
 WAIT_TIMEOUT_DEFAULT=900000
 START_TIMEOUT=120000
 
@@ -109,6 +111,20 @@ profile_of() {
   jq -nc --arg ccd "${ccd:-}" --arg ghd "${ghd:-}" \
     '{claude_config_dir: (if $ccd == "" then "default" else $ccd end),
       gh_config_dir: (if $ghd == "" then "default" else $ghd end)}'
+}
+
+# --- agent kind / model ---------------------------------------------------
+
+model_flag() {
+  case "$1" in
+    gemini|qwen) printf -- '-m' ;;
+    *) printf -- '--model' ;;
+  esac
+}
+
+agent_name_for() {
+  local slug=$1 kind=$2
+  if [ "$kind" = claude ]; then printf '%s\n' "$slug"; else printf '%s\n' "${slug:0:26}-${kind}"; fi
 }
 
 # --- hub scope ------------------------------------------------------------
@@ -258,9 +274,13 @@ ensure() {
     slug=$bslug; label=$blabel
   fi
 
+  slug=$(agent_name_for "$slug" "$KIND")
+  command -v "$KIND" >/dev/null \
+    || die "agent kind '${KIND}' の実行ファイルが PATH に無い。herdr integration status で導入状況を見る" 9
   local existing_agent
   existing_agent=$(herdr agent list \
-    | jq -c --arg ws "$ws" '[.result.agents[] | select(.workspace_id == $ws and .agent == "claude")] | first // empty')
+    | jq -c --arg ws "$ws" --arg kind "$KIND" \
+        '[.result.agents[] | select(.workspace_id == $ws and .agent == $kind)] | first // empty')
 
   if [ -n "$existing_agent" ]; then
     pane=$(jq -r .pane_id <<<"$existing_agent")
@@ -276,7 +296,9 @@ ensure() {
       sleep 1
     }
     name=$(unique_agent_name "$slug" "$pane")
-    if ! herdr agent start "$name" --kind claude --pane "$pane" --timeout "$START_TIMEOUT" >/dev/null; then
+    local -a start_args=(--kind "$KIND" --pane "$pane" --timeout "$START_TIMEOUT")
+    [ -z "$MODEL" ] || start_args+=(-- "$(model_flag "$KIND")" "$MODEL")
+    if ! herdr agent start "$name" "${start_args[@]}" >/dev/null; then
       herdr agent get "$name" >/dev/null 2>&1 \
         || die "agent 起動に失敗した（pane=${pane}）。herdr pane read $pane で確認する" 5
     fi
@@ -284,10 +306,12 @@ ensure() {
 
   jq -nc --arg slug "$slug" --arg name "$name" --arg label "$label" --arg path "$path" \
          --arg ws "$ws" --arg pane "$pane" --argjson created "$created" \
+         --arg kind "$KIND" --arg model "$MODEL" \
          --argjson profile "$(profile_of "$path")" \
          --arg status "$(herdr agent get "$name" 2>/dev/null | jq -r '.result.agent.agent_status // "unknown"' || echo unknown)" \
     '{slug: $slug, agent: $name, label: $label, path: $path, workspace_id: $ws, pane_id: $pane,
-      created: $created, status: $status, profile: $profile}'
+      created: $created, status: $status, kind: $kind,
+      model: (if $model == "" then null else $model end), profile: $profile}'
 }
 
 # --- send -----------------------------------------------------------------
@@ -312,6 +336,15 @@ send() {
   slug=$(jq -r .agent <<<"$info"); path=$(jq -r .path <<<"$info")
   [ "$(jq -r .status <<<"$info")" != blocked ] \
     || die "agent が承認待ち（blocked）で投入できない: ${slug}。herdr agent read $slug で確認し、人の判断を仰ぐ" 4
+
+  if [ -n "$MODEL" ] && [ "$(jq -r .created <<<"$info")" = false ]; then
+    if [ "$KIND" = claude ]; then
+      herdr agent prompt "$slug" "/model ${MODEL}" >/dev/null
+      herdr agent wait "$slug" --timeout 30000 >/dev/null 2>&1 || true
+    else
+      printf 'fleet: 起動済みの %s agent にはモデルを切り替えられない。現状のまま投入する\n' "$KIND" >&2
+    fi
+  fi
 
   ts=$(date -u +%Y%m%dT%H%M%SZ)
   report="$STATE/reports/$(jq -r .slug <<<"$info")/$ts.md"
@@ -348,7 +381,7 @@ status() {
     else exists=false; mtime=''; fi
     if [ "$exists" = true ] && [ "$(cat "$STATE/dispatch/$slug.read" 2>/dev/null)" = "$rep" ]; then
       read_flag=true; else read_flag=false; fi
-    dispatch=$(jq -c --arg s "$slug" --argjson d "$(jq -c '{sent_at, report, prompt: .prompt[0:120]}' "$f")" \
+    dispatch=$(jq -c --arg s "$slug" --argjson d "$(jq -c '{sent_at, report, kind, model, prompt: .prompt[0:120]}' "$f")" \
       --argjson exists "$exists" --argjson rd "$read_flag" --arg mtime "$mtime" \
       '.[$s] = ($d + {report_exists: $exists, read: $rd,
                       report_at: (if $mtime == "" then null else $mtime end)})' <<<"$dispatch")
@@ -400,16 +433,18 @@ fleet — Herdr 上の各リポジトリ agent にハブから作業を投げる
 
   fleet scope                          このハブの担当範囲を出す
   fleet targets [--all]                候補と現在の workspace/agent を JSON で出す
-  fleet ensure <target> [--branch B]   workspace と claude agent を冪等に用意する
+  fleet ensure <target> [opts]         workspace と agent を冪等に用意する
   fleet send <target> [opts]           報告契約付きでプロンプトを投入する
   fleet status [target] [--all]        agent の状態をまとめて出す
   fleet report <target> [--list]       最新 report を表示する
   fleet close <target> [--force]       fleet が作った workspace を閉じる
 
-send のオプション:
-  --prompt TEXT | --prompt-file PATH | -   プロンプト本文（- は標準入力）
-  --wait [--timeout MS]                    完了まで待つ（既定は非同期）
+ensure / send のオプション:
+  --prompt TEXT | --prompt-file PATH | -   プロンプト本文（send のみ。- は標準入力）
+  --wait [--timeout MS]                    完了まで待つ（既定は非同期。send のみ）
   --branch B                               worktree workspace で作業する
+  --kind K                                 agent の種類（既定 claude。herdr agent で一覧）
+  --model M                                モデル（claude なら fable / opus / sonnet / haiku 等）
 
 target は slug / workspace ラベル / ~ からの相対パス / 絶対パスで指定する。
 
@@ -417,6 +452,7 @@ target は slug / workspace ラベル / ~ からの相対パス / 絶対パス�
 ~/<root> なら その root 専用、~ なら他のタブが持たない root すべてになる。
 ~/.config/fleet/roots で、別の場所にあるルートを同じハブに寄せられる。
 --all は一覧の範囲外も表示する。--any-scope は投入の範囲チェックを外す（原則使わない）。
+既定は FLEET_KIND / FLEET_MODEL で変えられる。claude 以外の kind は agent 名が <slug>-<kind> になる。
 EOF
 }
 
@@ -439,6 +475,8 @@ main() {
       while [ $# -gt 0 ]; do
         case $1 in
           --branch) branch=$2; shift 2 ;;
+          --kind) KIND=$2; shift 2 ;;
+          --model) MODEL=$2; shift 2 ;;
           --any-scope) ANY_SCOPE=true; shift ;;
           -*) die "不明なオプション: $1" 2 ;;
           *) target=$1; shift ;;
@@ -455,6 +493,8 @@ main() {
           --wait) wait=true; shift ;;
           --timeout) timeout=$2; shift 2 ;;
           --branch) branch=$2; shift 2 ;;
+          --kind) KIND=$2; shift 2 ;;
+          --model) MODEL=$2; shift 2 ;;
           --any-scope) ANY_SCOPE=true; shift ;;
           -*) die "不明なオプション: $1" 2 ;;
           *) target=$1; shift ;;
