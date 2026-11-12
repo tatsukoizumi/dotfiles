@@ -24,6 +24,7 @@ ln -snfv ./dotfiles/git/.gitconfig $HOME/.gitconfig
 # Link personal scripts into PATH
 mkdir -p $HOME/.local/bin
 ln -snfv "$THIS_DIR/bin/fleet" "$HOME/.local/bin/fleet"
+ln -snfv "$THIS_DIR/bin/worklog" "$HOME/.local/bin/worklog"
 
 # Create ghostty config directory and symlink
 mkdir -p $HOME/.config/ghostty
