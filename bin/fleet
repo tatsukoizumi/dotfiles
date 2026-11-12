@@ -393,12 +393,21 @@ EOF
 }
 
 send() {
-  local target=$1 prompt=$2 wait=$3 timeout=$4 branch=$5 info slug path report ts
+  local target=$1 prompt=$2 wait=$3 timeout=$4 branch=$5 fresh=$6 info slug path report ts
   info=$(ensure "$target" "$branch") || exit $?
   [ -n "$info" ] || die "ターゲットの準備に失敗した: $target" 5
   slug=$(jq -r .agent <<<"$info"); path=$(jq -r .path <<<"$info")
   [ "$(jq -r .status <<<"$info")" != blocked ] \
     || die "agent が承認待ち（blocked）で投入できない: ${slug}。herdr agent read $slug で確認し、人の判断を仰ぐ" 4
+
+  if [ "$fresh" = true ] && [ "$(jq -r .created <<<"$info")" = false ]; then
+    [ "$KIND" = claude ] || die "--fresh は claude の agent だけに使える: ${slug}" 2
+    # 作業中に /clear を送ると、進行中のタスクの文脈を捨ててしまう。
+    [ "$(jq -r .status <<<"$info")" = idle ] \
+      || die "agent が待機中でないので --fresh で始め直せない: ${slug}。fleet status で終わるのを待つ" 4
+    herdr agent prompt "$slug" "/clear" >/dev/null
+    herdr agent wait "$slug" --timeout 30000 >/dev/null 2>&1 || true
+  fi
 
   if [ -n "$MODEL" ] && [ "$(jq -r .created <<<"$info")" = false ]; then
     if [ "$KIND" = claude ]; then
@@ -518,6 +527,7 @@ fleet — Herdr 上の各リポジトリ agent にハブから作業を投げる
 ensure / send のオプション:
   --prompt TEXT | --prompt-file PATH | -   プロンプト本文（send のみ。- は標準入力）
   --wait [--timeout MS]                    完了まで待つ（既定は非同期。send のみ）
+  --fresh                                  起動済みの agent に /clear してから送る（別タスクの依頼。send のみ）
   --branch B                               worktree workspace で作業する
   --kind K                                 agent の種類（既定 claude。herdr agent で一覧）
   --model M                                モデル（claude なら fable / opus / sonnet / haiku 等）
@@ -574,9 +584,10 @@ main() {
       done
       ensure "$target" "$branch" ;;
     send)
-      local target='' prompt='' wait=false timeout=$WAIT_TIMEOUT_DEFAULT branch='' got=false
+      local target='' prompt='' wait=false timeout=$WAIT_TIMEOUT_DEFAULT branch='' got=false fresh=false
       while [ $# -gt 0 ]; do
         case $1 in
+          --fresh) fresh=true; shift ;;
           --prompt) prompt=$2; got=true; shift 2 ;;
           --prompt-file) prompt=$(cat "$2"); got=true; shift 2 ;;
           -) prompt=$(cat); got=true; shift ;;
@@ -591,7 +602,7 @@ main() {
         esac
       done
       [ "$got" = true ] && [ -n "$prompt" ] || die 'プロンプトを --prompt / --prompt-file / - で渡す' 2
-      send "$target" "$prompt" "$wait" "$timeout" "$branch" ;;
+      send "$target" "$prompt" "$wait" "$timeout" "$branch" "$fresh" ;;
     status)
       while [ $# -gt 0 ]; do
         case $1 in --all) SHOW_ALL=true; shift ;; -*) die "不明なオプション: $1" 2 ;; *) break ;; esac
