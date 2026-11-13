@@ -5,7 +5,7 @@ set -euo pipefail
 STATE=${FLEET_STATE:-$HOME/.local/state/fleet}
 HUB_WS=${FLEET_HUB_WORKSPACE:-entry}
 ROOTS_CONF=${FLEET_ROOTS_CONF:-$HOME/.config/fleet/roots}
-HUB_TAB=''
+HUB_NAME=''
 HUB_SCOPE=''
 ANY_SCOPE=false
 SHOW_ALL=false
@@ -168,15 +168,22 @@ require_hub() {
   # workspace_id は herdr の再起動で振り直されるのでラベルで判定する。📌 などの飾りは無視する
   [ "$(strip_deco "$wslabel")" = "$(strip_deco "$HUB_WS")" ] \
     || die "ここはハブではない（workspace=${wslabel:-不明}）。fleet は $HUB_WS workspace のハブ pane から使う" 8
-  cwd=$(herdr pane get "${HERDR_PANE_ID:-}" 2>/dev/null | jq -r '.result.pane.cwd // ""')
-  HUB_TAB=$(herdr tab get "${HERDR_TAB_ID:-}" 2>/dev/null | jq -r '.result.tab.label // ""')
+  local pane
+  pane=$(herdr pane get "${HERDR_PANE_ID:-}" 2>/dev/null | jq -c '.result.pane // {}')
+  cwd=$(jq -r '.cwd // ""' <<<"$pane")
+  # entry には notes などハブでない agent も並ぶ。ハブは git リポジトリの外で動く
+  ! git -C "$cwd" rev-parse --git-dir >/dev/null 2>&1 \
+    || die "ここはハブではない（cwd=${cwd} は git リポジトリ）" 8
+  HUB_NAME=$(jq -r '.label // ""' <<<"$pane")
   HUB_SCOPE=$(owner_of "$(root_of "$cwd")")
 }
 
 hub_roots() {
   herdr agent list \
     | jq -r --arg ws "${HERDR_WORKSPACE_ID:-}" '.result.agents[] | select(.workspace_id == $ws) | .cwd' \
-    | while read -r c; do owner_of "$(root_of "$c")"; done | sort -u | grep -v '^$' || true
+    | while read -r c; do
+        git -C "$c" rev-parse --git-dir >/dev/null 2>&1 || owner_of "$(root_of "$c")"
+      done | sort -u | grep -v '^$' || true
 }
 
 in_scope() {
@@ -189,9 +196,9 @@ in_scope() {
 scope_hint() {
   local owner; owner=$(owner_of "$1")
   if [ -n "$owner" ] && hub_roots | grep -qxF "$owner"; then
-    printf '%s のハブタブ' "$owner"
+    printf '%s のハブ' "$owner"
   else
-    printf '個人ハブ（cwd が ~ のタブ）'
+    printf '個人ハブ（cwd が ~ の pane）'
   fi
 }
 
@@ -207,12 +214,12 @@ scope_filter() {
 }
 
 scope_cmd() {
-  jq -nc --arg tab "$HUB_TAB" --arg scope "$HUB_SCOPE" \
+  jq -nc --arg tab "$HUB_NAME" --arg scope "$HUB_SCOPE" \
          --argjson claimed "$(hub_roots | jq -R . | jq -sc .)" \
          --argjson map "$(owner_map)" \
          --argjson targets "$(index | scope_filter | jq 'length')" \
-    '{hub_tab: $tab,
-      scope: (if $scope == "" then "個人（他のハブタブが持たない root すべて）" else $scope end),
+    '{hub: $tab,
+      scope: (if $scope == "" then "個人（他のハブが持たない root すべて）" else $scope end),
       hub_roots: $claimed, root_aliases: $map, targets_in_scope: $targets}'
 }
 
@@ -252,7 +259,7 @@ ensure() {
     || die "自分自身（ハブの workspace）はターゲットにできない: $slug" 2
   local troot; troot=$(jq -r .root <<<"$t")
   [ "$ANY_SCOPE" = true ] || in_scope "$troot" \
-    || die "このハブ（${HUB_TAB:-個人}）の担当外: ${slug}（root=${troot:-~}）。$(scope_hint "$troot")から投げる" 8
+    || die "このハブ（${HUB_NAME:-個人}）の担当外: ${slug}（root=${troot:-~}）。$(scope_hint "$troot")から投げる" 8
 
   if [ -z "$ws" ]; then
     local res
@@ -341,7 +348,7 @@ cloud_cmd() {
   path=$(jq -r .path <<<"$t"); slug=$(jq -r .slug <<<"$t")
   local troot; troot=$(jq -r .root <<<"$t")
   [ "$ANY_SCOPE" = true ] || in_scope "$troot" \
-    || die "このハブ（${HUB_TAB:-個人}）の担当外: ${slug}。$(scope_hint "$troot")から投げる" 8
+    || die "このハブ（${HUB_NAME:-個人}）の担当外: ${slug}。$(scope_hint "$troot")から投げる" 8
   command -v claude >/dev/null || die "claude が PATH に無い" 9
   git -C "$path" remote get-url origin >/dev/null 2>&1 \
     || die "クラウド実行はリモートからクローンするため origin が必要: ${path}" 10
@@ -543,8 +550,8 @@ ensure / send のオプション:
 
 target は slug / workspace ラベル / ~ からの相対パス / 絶対パスで指定する。
 
-ハブは entry workspace の各タブに置いた Claude。担当範囲はそのタブの cwd で決まり、
-~/<root> なら その root 専用、~ なら他のタブが持たない root すべてになる。
+ハブは entry workspace に置いた Claude の pane。担当範囲はその pane の cwd で決まり、
+~/<root> なら その root 専用、~ なら他のハブが持たない root すべてになる。
 ~/.config/fleet/roots で、別の場所にあるルートを同じハブに寄せられる。
 --all は一覧の範囲外も表示する。--any-scope は投入の範囲チェックを外す（原則使わない）。
 既定は FLEET_KIND / FLEET_MODEL で変えられる。claude 以外の kind は agent 名が <slug>-<kind> になる。

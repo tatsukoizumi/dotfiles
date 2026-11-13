@@ -1,10 +1,9 @@
 #!/bin/bash
-# ハブのタブから、notes の work-log タブの Claude に稼働の開始・終了のコマンド (/<root>-start・/<root>-end) を送る。
-# <root> はこのタブの cwd の ~ 直下のフォルダ名。コマンドの無い root では送らない。
+# ハブの pane から、work-log と名付けた pane の Claude に稼働の開始・終了のコマンド (/<root>-start・/<root>-end) を送る。
+# <root> はこの pane の cwd の ~ 直下のフォルダ名。コマンドの無い root では送らない。
 set -euo pipefail
 
-NOTES_WS=${WORKLOG_WORKSPACE:-notes}
-NOTES_TAB=${WORKLOG_TAB:-work-log}
+TARGET_LABEL=${WORKLOG_PANE_LABEL:-work-log}
 COMMANDS_DIR=${WORKLOG_COMMANDS_DIR:-$HOME/notes/.claude/commands}
 TIMEOUT=${WORKLOG_TIMEOUT:-180000}
 
@@ -12,14 +11,14 @@ die() { printf 'worklog: %s\n' "$1" >&2; exit "${2:-1}"; }
 
 usage() {
   cat <<'EOF'
-worklog — notes の work-log タブで稼働の開始・終了を記録する
+worklog — work-log の pane で稼働の開始・終了を記録する
 
   worklog start [今日やること]     /<root>-start を送る
   worklog end [今日やったこと]     /<root>-end を送る
-  worklog root                     このタブの root を出す
+  worklog root                     この pane の root を出す
 
-<root> はこのタブの cwd の ~ 直下のフォルダ名（~/<root>/... ならその root）。
-送り先は workspace「notes」のタブ「work-log」の agent（WORKLOG_WORKSPACE / WORKLOG_TAB で変えられる）。
+<root> はこの pane の cwd の ~ 直下のフォルダ名（~/<root>/... ならその root）。
+送り先はラベルが「work-log」の pane の agent（WORKLOG_PANE_LABEL で変えられる）。
 EOF
 }
 
@@ -27,25 +26,21 @@ EOF
 command -v herdr >/dev/null || die 'herdr が PATH にない' 2
 command -v jq >/dev/null || die 'jq が PATH にない' 2
 
-root_of_tab() {
+root_of_pane() {
   local cwd rel
   cwd=$(herdr pane get "${HERDR_PANE_ID:-}" 2>/dev/null | jq -r '.result.pane.cwd // ""')
-  [ -n "$cwd" ] || die 'このタブの cwd を取れない' 3
+  [ -n "$cwd" ] || die 'この pane の cwd を取れない' 3
   case "$cwd" in
     "$HOME"/*) rel=${cwd#"$HOME"/} ;;
-    *) die "~ の下ではないタブでは使えない（cwd=${cwd}）" 3 ;;
+    *) die "~ の下ではない pane では使えない（cwd=${cwd}）" 3 ;;
   esac
   printf '%s\n' "${rel%%/*}"
 }
 
 worklog_pane() {
-  local ws tab pane
-  ws=$(herdr workspace list | jq -r --arg l "$NOTES_WS" '.result.workspaces[] | select(.label == $l) | .workspace_id' | head -1)
-  [ -n "$ws" ] || die "workspace「${NOTES_WS}」が無い" 4
-  tab=$(herdr tab list | jq -r --arg w "$ws" --arg l "$NOTES_TAB" '.result.tabs[] | select(.workspace_id == $w and .label == $l) | .tab_id' | head -1)
-  [ -n "$tab" ] || die "workspace「${NOTES_WS}」にタブ「${NOTES_TAB}」が無い" 4
-  pane=$(herdr agent list | jq -r --arg t "$tab" '.result.agents[] | select(.tab_id == $t) | .pane_id' | head -1)
-  [ -n "$pane" ] || die "タブ「${NOTES_TAB}」に agent が居ない（Claude を起動してから使う）" 4
+  local pane
+  pane=$(herdr pane list | jq -r --arg l "$TARGET_LABEL" '.result.panes[] | select(.label == $l and has("agent")) | .pane_id' | head -1)
+  [ -n "$pane" ] || die "ラベル「${TARGET_LABEL}」の pane に agent が居ない（Claude を起動し herdr pane rename で名付けてから使う）" 4
   printf '%s\n' "$pane"
 }
 
@@ -53,12 +48,12 @@ action=${1:-}
 [ $# -gt 0 ] && shift
 case "$action" in
   start | end) ;;
-  root) root_of_tab; exit 0 ;;
+  root) root_of_pane; exit 0 ;;
   -h | --help | help | '') usage; exit 0 ;;
   *) usage >&2; exit 1 ;;
 esac
 
-root=$(root_of_tab)
+root=$(root_of_pane)
 command_name="${root}-${action}"
 [ -f "$COMMANDS_DIR/${command_name}.md" ] \
   || die "/${command_name} が無い（${COMMANDS_DIR}）。この root の稼働の記録は未設定" 5
