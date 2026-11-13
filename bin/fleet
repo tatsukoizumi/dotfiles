@@ -198,7 +198,7 @@ scope_hint() {
   if [ -n "$owner" ] && hub_roots | grep -qxF "$owner"; then
     printf '%s のハブ' "$owner"
   else
-    printf '個人ハブ（cwd が ~ の pane）'
+    printf 'general ハブ（cwd が ~ の pane）'
   fi
 }
 
@@ -219,7 +219,7 @@ scope_cmd() {
          --argjson map "$(owner_map)" \
          --argjson targets "$(index | scope_filter | jq 'length')" \
     '{hub: $tab,
-      scope: (if $scope == "" then "個人（他のハブが持たない root すべて）" else $scope end),
+      scope: (if $scope == "" then "general（他のハブが持たない root すべて）" else $scope end),
       hub_roots: $claimed, root_aliases: $map, targets_in_scope: $targets}'
 }
 
@@ -259,7 +259,7 @@ ensure() {
     || die "自分自身（ハブの workspace）はターゲットにできない: $slug" 2
   local troot; troot=$(jq -r .root <<<"$t")
   [ "$ANY_SCOPE" = true ] || in_scope "$troot" \
-    || die "このハブ（${HUB_NAME:-個人}）の担当外: ${slug}（root=${troot:-~}）。$(scope_hint "$troot")から投げる" 8
+    || die "このハブ（${HUB_NAME:-general}）の担当外: ${slug}（root=${troot:-~}）。$(scope_hint "$troot")から投げる" 8
 
   if [ -z "$ws" ]; then
     local res
@@ -348,7 +348,7 @@ cloud_cmd() {
   path=$(jq -r .path <<<"$t"); slug=$(jq -r .slug <<<"$t")
   local troot; troot=$(jq -r .root <<<"$t")
   [ "$ANY_SCOPE" = true ] || in_scope "$troot" \
-    || die "このハブ（${HUB_NAME:-個人}）の担当外: ${slug}。$(scope_hint "$troot")から投げる" 8
+    || die "このハブ（${HUB_NAME:-general}）の担当外: ${slug}。$(scope_hint "$troot")から投げる" 8
   command -v claude >/dev/null || die "claude が PATH に無い" 9
   git -C "$path" remote get-url origin >/dev/null 2>&1 \
     || die "クラウド実行はリモートからクローンするため origin が必要: ${path}" 10
