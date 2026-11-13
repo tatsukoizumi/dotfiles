@@ -273,7 +273,15 @@ ensure() {
     if [ -n "$existing" ]; then
       ws=$existing
     else
-      wtres=$(herdr worktree create --workspace "$ws" --branch "$branch" --label "$blabel" --no-focus)
+      # 何も指定しないと元リポジトリの今の HEAD から切られるので、最新のデフォルトブランチを起点にする
+      local base=()
+      if git -C "$path" fetch -q origin 2>/dev/null; then
+        local def
+        def=$(git -C "$path" symbolic-ref -q --short refs/remotes/origin/HEAD \
+          || { git -C "$path" remote set-head origin -a >/dev/null 2>&1 && git -C "$path" symbolic-ref -q --short refs/remotes/origin/HEAD; } || true)
+        [ -n "$def" ] && ! git -C "$path" show-ref -q --verify "refs/heads/$branch" && base=(--base "$def")
+      fi
+      wtres=$(herdr worktree create --workspace "$ws" --branch "$branch" ${base[@]+"${base[@]}"} --label "$blabel" --no-focus)
       ws=$(jq -r '[.result | .. | objects | select(has("workspace_id")) | .workspace_id] | first' <<<"$wtres")
       [ -n "$ws" ] && [ "$ws" != null ] || die "worktree 作成の応答を解釈できない: $wtres"
       path=$(jq -r '[.result | .. | objects | .checkout_path? // empty] | first // empty' <<<"$wtres")
