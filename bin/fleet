@@ -246,6 +246,20 @@ unique_agent_name() {
   printf '%s\n' "$name"
 }
 
+# 新しい workspace は末尾に足されるので、ハブを先頭に、残りをラベルの root（最初の / より前）ごとにまとめる。
+# root 内の順は今の並びを保つ。CLI に並べ替えが無いため socket API の workspace.move_block を直接呼ぶ
+sort_workspaces() {
+  local ids
+  [ -S "${HERDR_SOCKET_PATH:-}" ] && command -v nc >/dev/null || return 0
+  ids=$(herdr workspace list | jq -c --arg hub "$(strip_deco "$HUB_WS")" '
+    def plain: gsub("[\\p{So}\\p{Sk}\\p{Z}\\x{FE0F}\\x{200D}]"; "");
+    [.result.workspaces | to_entries
+     | sort_by([(.value.label | plain) != $hub, (.value.label | plain | split("/")[0] | split("#")[0] | ascii_downcase), .key])[]
+     | .value.workspace_id]')
+  jq -nc --argjson ids "$ids" '{id: "fleet-sort", method: "workspace.move_block", params: {workspace_ids: $ids, before_workspace_id: null}}' \
+    | nc -U -w 2 "$HERDR_SOCKET_PATH" >/dev/null 2>&1 || true
+}
+
 ensure() {
   local target=$1 branch=${2:-} idx t path label slug ws pane name created=false
   idx=$(index) || exit $?
@@ -297,6 +311,8 @@ ensure() {
     fi
     slug=$bslug; label=$blabel
   fi
+
+  [ "$created" = false ] || sort_workspaces
 
   slug=$(agent_name_for "$slug" "$KIND")
   local existing_agent
