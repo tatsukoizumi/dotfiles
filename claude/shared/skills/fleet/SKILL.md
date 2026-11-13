@@ -91,6 +91,8 @@ fleet status            # 全 agent の状態 + report の到着状況
 fleet report <target>   # 最新 report を読む
 ```
 
+`fleet send` は非同期で、終わっても通知は来ない。**投げたら毎回、同じ target で `fleet watch <target>` をバックグラウンド実行する**（Bash の `run_in_background`）。report が届くと report を出力して終了し、その終了通知で回収のタイミングが分かる。承認待ちになったときも終了する（終了コード 5）。worktree の target はラベル（`<repo>#<branch>`）で指定する。続きの依頼を同じ target に投げ直したら、前の watch は古い report を見ていないので、そのまま新しい report まで待つ。
+
 子の回答は pane からは読み取れない（Claude Code は代替スクリーンで動くため）。回収は必ず report ファイル経由で行う。`fleet status` の `reports_unread` に出たものを `fleet report` で読む。
 
 `blocked` は承認待ちか質問待ち。**勝手に答えない。** `herdr agent read <agent名>` で何を聞かれているか確認し、ユーザーに判断を仰ぐ。
